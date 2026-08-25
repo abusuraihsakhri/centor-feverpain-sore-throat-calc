@@ -1,0 +1,6 @@
+patient_id,fever_past_24h,purulence_or_pus,rapid_attendance_le_3d,severely_inflamed_tonsils,no_cough_or_coryza,tender_anterior_cervical_nodes,age,weight_kg,penicillin_allergic
+PT-101,1,1,1,1,1,1,24,70.0,0
+PT-102,0,0,0,0,0,0,32,65.0,0
+PT-103,1,1,0,0,0,1,8,26.0,0
+PT-104,1,1,1,0,0,0,52,80.0,1
+PT-105,0,1,1,1,1,1,16,55.0,0
