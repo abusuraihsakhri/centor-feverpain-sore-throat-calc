@@ -1,124 +1,63 @@
-# Centor Feverpain Sore Throat Calc
+# Centor & FeverPAIN Sore Throat Antibiotic Stewardship Calculator
 
-> **Domain:** Clinical Decision Support & Biomedical Computing  
-> **Reference Guidelines & Standards:** `Standard Clinical Formulations & ISO/IEC Quality Frameworks`
-
-<div align="center">
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
-
-</div>
+> **Domain:** Primary Care, Emergency Medicine & Antimicrobial Stewardship  
+> **Clinical Guidelines:** NICE NG84 (Sore throat: antimicrobial prescribing), Little et al. (BMJ 2013), Centor et al. (Med Decis Making 1981), McIsaac et al. (CMAJ 1998)
 
 ---
 
-## 📖 What It Does
+## 📖 Clinical Overview
 
-FeverPAIN and Centor Clinical Decision Rules for Acute Sore Throat & Pharyngitis
-Implements validated clinical prediction rules (NICE NG84, Little et al. 2013, Centor et al. 1981, McIsaac et al. 1998)
-for Group A Streptococcal (GAS) pharyngitis risk stratification and antimicrobial stewardship.
+The **Centor & FeverPAIN Sore Throat Calculator** stratifies the risk of Group A Streptococcal (GAS) pharyngitis in patients presenting with acute sore throat. It guides evidence-based antimicrobial prescribing, mitigates inappropriate antibiotic usage for viral self-limiting infections, identifies red flag surgical complications (quinsy, peritonsillar abscess, epiglottitis), and tailors first-line antibiotic regimens based on age, weight, and penicillin allergy status.
 
-Author: Dr. Abu Suraih Sakhri
-License: MIT
+### Criteria & Scoring Systems
 
----
+#### 1. FeverPAIN Score (NICE NG84 Primary Recommendation)
+- **F**ever in past 24 hours (+1)
+- **P**urulence (pus on tonsils) (+1)
+- **A**ttend rapidly (presentation $\le 3$ days from symptom onset) (+1)
+- **I**nflamed severely (tonsils severely inflamed) (+1)
+- **N**o cough or coryza (+1)
 
-## ⚙️ Key Capabilities & Algorithmic Modules
+| FeverPAIN Score | GAS Likelihood | NICE Antimicrobial Strategy |
+|:---|:---|:---|
+| **0 – 1** | 13% – 18% | **No antibiotic**: Self-care and analgesia (paracetamol / ibuprofen) |
+| **2 – 3** | 34% – 40% | **Delayed / Back-up prescription**: Re-evaluate if no improvement in 3–5 days or consider RADT |
+| **4 – 5** | 62% – 65% | **Immediate antibiotic prescription**: Penicillin V / Phenoxymethylpenicillin (or Clarithromycin / Erythromycin if allergic) |
 
-### 🔬 Core Algorithmic & Evaluation Engines
-
-- **`PrescribingStrategy`** — dedicated module for prescribing strategy evaluation and state verification.
-- **`SeverityTier`** — dedicated module for severity tier evaluation and state verification.
-- **`RedFlagAssessment`** — dedicated module for red flag assessment evaluation and state verification.
-- **`AntibioticRecommendation`** — dedicated module for antibiotic recommendation evaluation and state verification.
-- **`ClinicalEvaluationResult`** — dedicated module for clinical evaluation result evaluation and state verification.
-
----
-
-## 📐 Mathematical Formulation & Logic
-
-```text
-  Calculates FeverPAIN score (0-5) based on Little et al. (BMJ 2013) & NICE NG84.
-  score = 0
-  Calculates original Centor score (0-4) (Centor et al. 1981).
-  score = (
-  elif score == 2:
-```
+#### 2. Modified Centor (McIsaac) Score
+- Tonsillar exudate (+1)
+- Tender anterior cervical lymphadenopathy (+1)
+- Absence of cough (+1)
+- History of fever / temperature > 38°C (+1)
+- Age Modifier:
+  - 3 to 14 years: +1
+  - 15 to 44 years: 0
+  - $\ge 45$ years: -1
 
 ---
 
 ## 💻 CLI Quickstart & Usage
 
-### 1. Guided Interactive Mode
+### 1. Evaluate Individual Patient Presentation
 ```bash
-python cli.py
+python cli.py eval --fever --purulence --rapid --inflamed --no-cough --nodes --age 24 --weight 70
 ```
 
-### 2. Direct Parameterized Evaluation
+### 2. Interactive Guided Clinical Questionnaire
 ```bash
-python cli.py --- <value> --fever <value> --pus <value> --rapid-onset <value>
+python cli.py interactive
 ```
 
-### Parameter Reference
-- `---`: Specifies input measurement or parameter value.
-- `--fever`: Specifies input measurement or parameter value.
-- `--pus`: Specifies input measurement or parameter value.
-- `--rapid-onset`: Specifies input measurement or parameter value.
-- `--inflamed`: Specifies input measurement or parameter value.
-- `--no-cough`: Specifies input measurement or parameter value.
-- `--tender-nodes`: Specifies input measurement or parameter value.
-- `--age`: Specifies input measurement or parameter value.
-- `--weight`: Specifies input measurement or parameter value.
-- `--penicillin-allergy`: Specifies input measurement or parameter value.
-
-### Input Data Schema
-
-| Field | Description | Requirement |
-|:------|:------------|:------------|
-| `patient_id` | Parameter / observation metric | Required |
-| `fever_past_24h` | Parameter / observation metric | Required |
-| `purulence_or_pus` | Parameter / observation metric | Required |
-| `rapid_attendance_le_3d` | Parameter / observation metric | Required |
-| `severely_inflamed_tonsils` | Parameter / observation metric | Required |
-| `no_cough_or_coryza` | Parameter / observation metric | Required |
-| `tender_anterior_cervical_nodes` | Parameter / observation metric | Required |
-| `age` | Parameter / observation metric | Required |
-
----
-
-## 🛡️ Security & Enterprise Architecture
-
-* **Zero-PHI Outbound Interceptor:** Active AST and regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
-* **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs for every evaluation and state transition.
-* **Air-Gapped LLM Reasoning Adapter:** Agnostic integration for local Ollama instances (`llama3`, `mistral`), Claude 3.5 Sonnet, GPT-4o, and deterministic test mocks.
-* **Active Learning Bayesian Calibration:** Dynamic tracker updating worker reliability weights and monitoring Brier calibration drift.
-* **FastAPI & Prometheus Telemetry:** Exposes OpenAPI 3.1 REST endpoints and operational Prometheus metrics (`/metrics`).
-
----
-
-## 🧪 Testing & Verification
-
-Run the automated test suite:
-
+### 3. Batch Process Patient Presentation Cohort
 ```bash
-pytest -v
-```
-
-Execute high-throughput batch simulation benchmarks:
-
-```bash
-python simulator.py --tasks 1000 --concurrency 8
+python cli.py batch -i sample.csv -o out_results.csv
 ```
 
 ---
 
-## 🐳 Container Deployment
+## 🧪 Verification & Testing
 
+Execute comprehensive unit tests via pytest:
 ```bash
-docker build -t centor-feverpain-sore-throat-calc .
-docker run -p 8000:8000 centor-feverpain-sore-throat-calc
+python -m pytest -p no:zarr
 ```
