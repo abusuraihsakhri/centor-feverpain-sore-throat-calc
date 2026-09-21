@@ -1,5 +1,7 @@
 # FeverPAIN & Centor Sore Throat Calculator
 
+### [Open the Live Application →](https://abusuraihsakhri.github.io/centor-feverpain-sore-throat-calc/)
+
 A compact browser and Python implementation of the FeverPAIN and Centor clinical criteria for acute sore throat, with antimicrobial-prescribing categories aligned to NICE NG84.
 
 ## Features
@@ -20,7 +22,7 @@ FeverPAIN was not tested in children under 3 years, and NICE directs children un
 
 ## Browser use
 
-Open the GitHub Pages application from the repository homepage. The browser version is static HTML/CSS/JavaScript; it does not require a backend or Pyodide. Patient inputs are processed locally in the browser and are not transmitted or stored by the application.
+Open the live application link above. The browser version is static HTML/CSS/JavaScript; it does not require a backend or Pyodide. Patient inputs are processed locally in the browser and are not transmitted or stored by the application.
 
 ## Python use
 
