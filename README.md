@@ -1,63 +1,63 @@
-# Centor & FeverPAIN Sore Throat Antibiotic Stewardship Calculator
+# FeverPAIN & Centor Sore Throat Calculator
 
-> **Domain:** Primary Care, Emergency Medicine & Antimicrobial Stewardship  
-> **Clinical Guidelines:** NICE NG84 (Sore throat: antimicrobial prescribing), Little et al. (BMJ 2013), Centor et al. (Med Decis Making 1981), McIsaac et al. (CMAJ 1998)
+A compact browser and Python implementation of the FeverPAIN and Centor clinical criteria for acute sore throat, with antimicrobial-prescribing categories aligned to NICE NG84.
 
----
+## Features
 
-## 📖 Clinical Overview
+- FeverPAIN (0–5) and Centor (0–4) scoring.
+- Explicit choice of decision rule; the thresholds are not combined into a hybrid score.
+- Red-flag screening that supersedes routine scoring when serious illness or a suppurative complication is suspected.
+- NICE NG84 prescribing categories and first-choice antibiotic information when a prescription is being considered.
+- Responsive browser interface with light and dark modes.
+- Python CLI, interactive assessment and batch CSV processing.
+- Unit tests for scoring, decision-rule separation, antibiotic age/weight bands, aliases, CLI output and browser logic.
 
-The **Centor & FeverPAIN Sore Throat Calculator** stratifies the risk of Group A Streptococcal (GAS) pharyngitis in patients presenting with acute sore throat. It guides evidence-based antimicrobial prescribing, mitigates inappropriate antibiotic usage for viral self-limiting infections, identifies red flag surgical complications (quinsy, peritonsillar abscess, epiglottitis), and tailors first-line antibiotic regimens based on age, weight, and penicillin allergy status.
+## Clinical scope
 
-### Criteria & Scoring Systems
+This is clinical decision support, not a diagnostic or prescribing system. Acute sore throat is commonly self-limiting. NICE recommends FeverPAIN or Centor to identify people more likely to benefit from antibiotics, while advising urgent reassessment when symptoms suggest a more serious condition.
 
-#### 1. FeverPAIN Score (NICE NG84 Primary Recommendation)
-- **F**ever in past 24 hours (+1)
-- **P**urulence (pus on tonsils) (+1)
-- **A**ttend rapidly (presentation $\le 3$ days from symptom onset) (+1)
-- **I**nflamed severely (tonsils severely inflamed) (+1)
-- **N**o cough or coryza (+1)
+FeverPAIN was not tested in children under 3 years, and NICE directs children under 5 with fever to its fever-in-under-5s guidance. Antibiotic selection also requires review of allergies, pregnancy, interactions, renal/hepatic function, local resistance patterns and current BNF/local formulary guidance.
 
-| FeverPAIN Score | GAS Likelihood | NICE Antimicrobial Strategy |
-|:---|:---|:---|
-| **0 – 1** | 13% – 18% | **No antibiotic**: Self-care and analgesia (paracetamol / ibuprofen) |
-| **2 – 3** | 34% – 40% | **Delayed / Back-up prescription**: Re-evaluate if no improvement in 3–5 days or consider RADT |
-| **4 – 5** | 62% – 65% | **Immediate antibiotic prescription**: Penicillin V / Phenoxymethylpenicillin (or Clarithromycin / Erythromycin if allergic) |
+## Browser use
 
-#### 2. Modified Centor (McIsaac) Score
-- Tonsillar exudate (+1)
-- Tender anterior cervical lymphadenopathy (+1)
-- Absence of cough (+1)
-- History of fever / temperature > 38°C (+1)
-- Age Modifier:
-  - 3 to 14 years: +1
-  - 15 to 44 years: 0
-  - $\ge 45$ years: -1
+Open the GitHub Pages application from the repository homepage. The browser version is static HTML/CSS/JavaScript; it does not require a backend or Pyodide. Patient inputs are processed locally in the browser and are not transmitted or stored by the application.
 
----
+## Python use
 
-## 💻 CLI Quickstart & Usage
+Evaluate one case:
 
-### 1. Evaluate Individual Patient Presentation
 ```bash
-python cli.py eval --fever --purulence --rapid --inflamed --no-cough --nodes --age 24 --weight 70
+python cli.py eval --fever --pus --rapid-onset --inflamed --no-cough --age 24
 ```
 
-### 2. Interactive Guided Clinical Questionnaire
+Use Centor as the active NICE decision rule:
+
 ```bash
-python cli.py interactive
+python cli.py eval --decision-rule centor --fever --pus --tender-nodes --age 24
 ```
 
-### 3. Batch Process Patient Presentation Cohort
+Batch-score a CSV file:
+
 ```bash
-python cli.py batch -i sample.csv -o out_results.csv
+python cli.py batch -i sample.csv -o results.csv
 ```
 
----
+## Testing
 
-## 🧪 Verification & Testing
-
-Execute comprehensive unit tests via pytest:
 ```bash
-python -m pytest -p no:zarr
+python -m unittest discover -s tests -p 'test_*.py' -v
+node site/tests.mjs
 ```
+
+GitHub Actions runs the Python suite on Python 3.10–3.13 and also checks the browser scoring module.
+
+## References
+
+- NICE NG84: *Sore throat (acute): antimicrobial prescribing* — https://www.nice.org.uk/guidance/ng84
+- Little P, et al. BMJ. 2013;347:f5806 — https://doi.org/10.1136/bmj.f5806
+- Centor RM, et al. Med Decis Making. 1981;1(3):239-246.
+- McIsaac WJ, et al. CMAJ. 1998;158(1):75-83.
+
+## License
+
+MIT. See `LICENSE`.
