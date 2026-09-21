@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="FeverPAIN and Centor sore-throat decision support aligned with NICE NG84.">
+  <meta name="color-scheme" content="light dark">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self';">
+  <title>FeverPAIN & Centor Sore Throat Calculator</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">NICE NG84 decision support</p>
+      <h1>FeverPAIN & Centor</h1>
+    </div>
+    <button id="theme-toggle" class="ghost" type="button" aria-pressed="false">Dark</button>
+  </header>
+
+  <main class="app-shell">
+    <section class="panel assessment" aria-labelledby="assessment-title">
+      <div class="panel-heading">
+        <div>
+          <h2 id="assessment-title">Assessment</h2>
+          <p>Choose one scoring rule and enter observed criteria.</p>
+        </div>
+        <div class="segmented" aria-label="Decision rule">
+          <label><input type="radio" name="rule" value="feverpain" form="assessment-form" checked><span>FeverPAIN</span></label>
+          <label><input type="radio" name="rule" value="centor" form="assessment-form"><span>Centor</span></label>
+        </div>
+      </div>
+
+      <form id="assessment-form">
+        <fieldset class="criteria-grid">
+          <legend>Clinical criteria</legend>
+          <label class="check-card"><input id="fever" type="checkbox"><span><strong>Fever</strong><small>Past 24 h</small></span></label>
+          <label class="check-card"><input id="purulence" type="checkbox"><span><strong>Purulence</strong><small>Tonsillar pus/exudate</small></span></label>
+          <label class="check-card" data-feverpain-only><input id="rapid" type="checkbox"><span><strong>Rapid attendance</strong><small>≤3 days</small></span></label>
+          <label class="check-card" data-feverpain-only><input id="inflamed" type="checkbox"><span><strong>Inflamed tonsils</strong><small>Severe</small></span></label>
+          <label class="check-card"><input id="no-cough" type="checkbox"><span><strong>No cough/coryza</strong><small>Absent</small></span></label>
+          <label class="check-card" data-centor-only><input id="nodes" type="checkbox"><span><strong>Tender nodes</strong><small>Anterior cervical</small></span></label>
+        </fieldset>
+
+        <div class="compact-row">
+          <label class="field"><span>Age</span><input id="age" type="number" min="0" max="120" step="0.1" inputmode="decimal" placeholder="years"></label>
+          <label class="field"><span>Weight</span><input id="weight" type="number" min="0.1" max="350" step="0.1" inputmode="decimal" placeholder="kg"></label>
+          <label class="switch-field"><input id="penicillin-allergy" type="checkbox"><span>Penicillin allergy / intolerance</span></label>
+        </div>
+
+        <details class="red-flags">
+          <summary>Red flags <span>screen before routine scoring</span></summary>
+          <div class="flag-grid">
+            <label><input id="stridor" type="checkbox"> Stridor</label>
+            <label><input id="breathing" type="checkbox"> Breathing difficulty</label>
+            <label><input id="swallowing" type="checkbox"> Drooling / cannot swallow</label>
+            <label><input id="trismus" type="checkbox"> Trismus / asymmetric swelling</label>
+            <label><input id="sepsis" type="checkbox"> Severe systemic illness</label>
+            <label><input id="unilateral" type="checkbox"> Severe unilateral pain</label>
+          </div>
+        </details>
+
+        <div class="actions">
+          <button class="primary" type="submit">Analyse</button>
+          <button id="reset-button" class="secondary" type="button">Reset</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="result-card" class="panel result" data-state="empty" aria-labelledby="result-title">
+      <div class="status-dot" aria-hidden="true"></div>
+      <p class="eyebrow">Result</p>
+      <h2 id="result-title" data-result-title>Ready to analyse</h2>
+      <p class="result-guidance" data-result-guidance>Select the criteria, choose a decision rule, then press Analyse.</p>
+
+      <div class="score-strip" aria-label="Scores">
+        <div><span>FeverPAIN</span><strong data-fp-score>—</strong></div>
+        <div><span>Centor</span><strong data-centor-score>—</strong></div>
+        <div><span>Active rule</span><strong data-active-rule>—</strong></div>
+        <div><span>Strep likelihood*</span><strong data-risk>—</strong></div>
+      </div>
+
+      <div class="result-detail" hidden>
+        <span>NG84 antibiotic option</span>
+        <p data-antibiotic></p>
+      </div>
+      <div class="result-detail">
+        <span>Clinical note</span>
+        <p data-note>No patient-identifiable data are stored or transmitted by this page.</p>
+      </div>
+
+      <div class="safety-note">
+        <strong>Clinical support only.</strong> This tool does not diagnose infection or replace examination, local antimicrobial policy, BNF review, or clinical judgement.
+      </div>
+
+      <p class="sources">
+        *FeverPAIN likelihood bands are those cited by NICE. Sources:
+        <a href="https://www.nice.org.uk/guidance/ng84/chapter/Recommendations" target="_blank" rel="noopener noreferrer">NICE NG84</a>
+        · <a href="https://www.bmj.com/content/347/bmj.f5806" target="_blank" rel="noopener noreferrer">PRISM trial</a>
+      </p>
+    </section>
+  </main>
+
+  <footer>Runs entirely in your browser. No patient data are sent to a server.</footer>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
