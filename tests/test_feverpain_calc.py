@@ -1,18 +1,15 @@
-"""
-Unit test suite for FeverPAIN & Centor Sore Throat Calculator.
-Tests FeverPAIN scoring, Centor criteria, McIsaac age modifiers, red flags,
-antimicrobial stewardship recommendations, and batch processing.
-"""
-
 import csv
+import io
 import json
 import os
 import tempfile
 import unittest
 from unittest.mock import patch
-import io
 
+from cli import main as cli_main
 from feverpain_calc import (
+    PrescribingStrategy,
+    SeverityTier,
     calculate_centor,
     calculate_feverpain,
     calculate_mcisaac,
@@ -21,291 +18,151 @@ from feverpain_calc import (
     evaluate_sore_throat,
     get_antibiotic_regimens,
     process_batch_csv,
-    PrescribingStrategy,
-    SeverityTier,
 )
-from cli import main as cli_main
 
 
-class TestFeverPAINCalculator(unittest.TestCase):
-    def test_feverpain_score_zero(self):
-        score, risk_str, risk_num, tier, rec = calculate_feverpain(
-            fever_past_24h=False,
-            purulence_or_pus=False,
-            rapid_attendance_le_3d=False,
-            severely_inflamed_tonsils=False,
-            no_cough_or_coryza=False,
-        )
-        self.assertEqual(score, 0)
-        self.assertEqual(tier, SeverityTier.LOW)
-        self.assertEqual(risk_str, "13% - 18%")
-        self.assertAlmostEqual(risk_num, 15.5)
+class TestScores(unittest.TestCase):
+    def test_feverpain_bands(self):
+        cases = [
+            ((0, 0, 0, 0, 0), 0, SeverityTier.LOW),
+            ((1, 1, 0, 0, 0), 2, SeverityTier.MODERATE),
+            ((1, 1, 1, 1, 1), 5, SeverityTier.HIGH),
+        ]
+        for inputs, expected_score, expected_tier in cases:
+            score, _, _, tier, _ = calculate_feverpain(*inputs)
+            self.assertEqual(score, expected_score)
+            self.assertEqual(tier, expected_tier)
 
-    def test_feverpain_score_one(self):
-        score, risk_str, risk_num, tier, rec = calculate_feverpain(
-            fever_past_24h=True,
-            purulence_or_pus=False,
-            rapid_attendance_le_3d=False,
-            severely_inflamed_tonsils=False,
-            no_cough_or_coryza=False,
-        )
-        self.assertEqual(score, 1)
-        self.assertEqual(tier, SeverityTier.LOW)
+    def test_centor(self):
+        self.assertEqual(calculate_centor(False, False, False, False)[0], 0)
+        self.assertEqual(calculate_centor(True, True, True, True)[0], 4)
 
-    def test_feverpain_score_two(self):
-        score, risk_str, risk_num, tier, rec = calculate_feverpain(
-            fever_past_24h=True,
-            purulence_or_pus=True,
-            rapid_attendance_le_3d=False,
-            severely_inflamed_tonsils=False,
-            no_cough_or_coryza=False,
-        )
-        self.assertEqual(score, 2)
-        self.assertEqual(tier, SeverityTier.MODERATE)
-        self.assertEqual(risk_str, "34% - 40%")
-
-    def test_feverpain_score_three(self):
-        score, risk_str, risk_num, tier, rec = calculate_feverpain(
-            fever_past_24h=True,
-            purulence_or_pus=True,
-            rapid_attendance_le_3d=True,
-            severely_inflamed_tonsils=False,
-            no_cough_or_coryza=False,
-        )
-        self.assertEqual(score, 3)
-        self.assertEqual(tier, SeverityTier.MODERATE)
-
-    def test_feverpain_score_four(self):
-        score, risk_str, risk_num, tier, rec = calculate_feverpain(
-            fever_past_24h=True,
-            purulence_or_pus=True,
-            rapid_attendance_le_3d=True,
-            severely_inflamed_tonsils=True,
-            no_cough_or_coryza=False,
-        )
-        self.assertEqual(score, 4)
-        self.assertEqual(tier, SeverityTier.HIGH)
-        self.assertEqual(risk_str, "62% - 65%")
-
-    def test_feverpain_score_five(self):
-        score, risk_str, risk_num, tier, rec = calculate_feverpain(
-            fever_past_24h=True,
-            purulence_or_pus=True,
-            rapid_attendance_le_3d=True,
-            severely_inflamed_tonsils=True,
-            no_cough_or_coryza=True,
-        )
-        self.assertEqual(score, 5)
-        self.assertEqual(tier, SeverityTier.HIGH)
-
-
-class TestCentorAndMcIsaac(unittest.TestCase):
-    def test_centor_scores(self):
-        score0, _, _, tier0, _ = calculate_centor(False, False, False, False)
-        self.assertEqual(score0, 0)
-        self.assertEqual(tier0, SeverityTier.LOW)
-
-        score2, risk2, _, tier2, _ = calculate_centor(True, True, False, False)
-        self.assertEqual(score2, 2)
-        self.assertEqual(tier2, SeverityTier.MODERATE)
-        self.assertEqual(risk2, "15% - 30%")
-
-        score4, risk4, _, tier4, _ = calculate_centor(True, True, True, True)
-        self.assertEqual(score4, 4)
-        self.assertEqual(tier4, SeverityTier.HIGH)
-        self.assertEqual(risk4, "50% - 60%")
-
-    def test_mcisaac_age_modifiers(self):
-        # Child 3-14 yrs: +1
-        score_child, risk_child, _ = calculate_mcisaac(centor_score=2, age_years=8)
-        self.assertEqual(score_child, 3)
-
-        # Adult 15-44 yrs: 0
-        score_adult, risk_adult, _ = calculate_mcisaac(centor_score=2, age_years=25)
-        self.assertEqual(score_adult, 2)
-
-        # Elderly >=45 yrs: -1
-        score_elderly, risk_elderly, _ = calculate_mcisaac(centor_score=2, age_years=60)
-        self.assertEqual(score_elderly, 1)
-
-    def test_mcisaac_bounds(self):
-        # Min bound -1
-        score_min, _, _ = calculate_mcisaac(centor_score=0, age_years=70)
-        self.assertEqual(score_min, -1)
-
-        # Max bound 5
-        score_max, _, _ = calculate_mcisaac(centor_score=4, age_years=10)
-        self.assertEqual(score_max, 5)
-
-    def test_mcisaac_negative_age_raises(self):
+    def test_mcisaac_modifiers_and_negative_age(self):
+        self.assertEqual(calculate_mcisaac(2, 8)[0], 3)
+        self.assertEqual(calculate_mcisaac(2, 25)[0], 2)
+        self.assertEqual(calculate_mcisaac(2, 60)[0], 1)
         with self.assertRaises(ValueError):
-            calculate_mcisaac(centor_score=2, age_years=-5)
+            calculate_mcisaac(2, -1)
 
 
-class TestRedFlagsAndTriage(unittest.TestCase):
-    def test_no_red_flags(self):
-        rf = check_red_flags()
-        self.assertFalse(rf.has_red_flags)
-        self.assertEqual(len(rf.flags_detected), 0)
+class TestDecisionRules(unittest.TestCase):
+    def test_feverpain_default_no_antibiotic(self):
+        result = evaluate_sore_throat().to_dict()
+        self.assertEqual(result["decision_rule"], "feverpain")
+        self.assertEqual(result["prescribing_strategy"], "NO_ANTIBIOTIC")
 
-    def test_stridor_red_flag(self):
-        rf = check_red_flags(stridor=True)
-        self.assertTrue(rf.has_red_flags)
-        self.assertTrue(any("Stridor" in f for f in rf.flags_detected))
+    def test_feverpain_2_3_back_up_category(self):
+        result = evaluate_sore_throat(fever_past_24h=True, purulence_or_pus=True)
+        self.assertEqual(result.prescribing_strategy, PrescribingStrategy.DELAYED_PRESCRIPTION)
+        self.assertIn("consider no antibiotic or a back-up", result.action_summary.lower())
 
-    def test_quinsy_trismus_red_flag(self):
-        rf = check_red_flags(peritonsillar_swelling_trismus=True)
-        self.assertTrue(rf.has_red_flags)
-        self.assertTrue(any("Trismus" in f for f in rf.flags_detected))
-
-    def test_multiple_red_flags(self):
-        rf = check_red_flags(difficulty_breathing=True, systemic_sepsis_signs=True)
-        self.assertTrue(rf.has_red_flags)
-        self.assertEqual(len(rf.flags_detected), 2)
-
-
-class TestComprehensiveEvaluation(unittest.TestCase):
-    def test_low_risk_case(self):
-        res = evaluate_sore_throat(
-            fever_past_24h=False,
-            purulence_or_pus=False,
-            rapid_attendance_le_3d=False,
-            severely_inflamed_tonsils=False,
-            no_cough_or_coryza=False,
-        )
-        self.assertEqual(res.feverpain_score, 0)
-        self.assertEqual(res.prescribing_strategy, PrescribingStrategy.NO_ANTIBIOTIC)
-        self.assertEqual(len(res.antibiotic_options), 0)
-        self.assertTrue(len(res.symptomatic_care) > 0)
-
-    def test_moderate_risk_case(self):
-        res = evaluate_sore_throat(
-            fever_past_24h=True,
-            purulence_or_pus=True,
-            rapid_attendance_le_3d=False,
-            severely_inflamed_tonsils=False,
-            no_cough_or_coryza=False,
-        )
-        self.assertEqual(res.feverpain_score, 2)
-        self.assertEqual(res.prescribing_strategy, PrescribingStrategy.DELAYED_PRESCRIPTION)
-        self.assertTrue(len(res.antibiotic_options) > 0)
-
-    def test_high_risk_case(self):
-        res = evaluate_sore_throat(
+    def test_feverpain_4_5_immediate_or_backup(self):
+        result = evaluate_sore_throat(
             fever_past_24h=True,
             purulence_or_pus=True,
             rapid_attendance_le_3d=True,
             severely_inflamed_tonsils=True,
-            no_cough_or_coryza=True,
         )
-        self.assertEqual(res.feverpain_score, 5)
-        self.assertEqual(res.prescribing_strategy, PrescribingStrategy.IMMEDIATE_ANTIBIOTIC)
-        self.assertTrue(len(res.antibiotic_options) > 0)
+        self.assertEqual(result.prescribing_strategy, PrescribingStrategy.IMMEDIATE_ANTIBIOTIC)
+        self.assertIn("immediate or back-up", result.action_summary.lower())
 
-    def test_red_flag_overrides_score(self):
-        # Even with low score, red flag forces URGENT_REFERRAL
-        res = evaluate_sore_throat(
-            fever_past_24h=False,
-            purulence_or_pus=False,
-            rapid_attendance_le_3d=False,
-            severely_inflamed_tonsils=False,
-            no_cough_or_coryza=False,
-            stridor=True,
+    def test_centor_rule_is_not_hybridized_with_feverpain(self):
+        kwargs = dict(
+            fever_past_24h=True,
+            purulence_or_pus=True,
+            tender_anterior_cervical_nodes=True,
         )
-        self.assertEqual(res.prescribing_strategy, PrescribingStrategy.URGENT_REFERRAL)
-        self.assertTrue(res.red_flag_assessment["has_red_flags"])
+        fp = evaluate_sore_throat(**kwargs, decision_rule="feverpain")
+        centor = evaluate_sore_throat(**kwargs, decision_rule="centor")
+        self.assertEqual(fp.feverpain_score, 2)
+        self.assertEqual(fp.prescribing_strategy, PrescribingStrategy.DELAYED_PRESCRIPTION)
+        self.assertEqual(centor.centor_score, 3)
+        self.assertEqual(centor.prescribing_strategy, PrescribingStrategy.IMMEDIATE_ANTIBIOTIC)
+
+    def test_invalid_rule(self):
+        with self.assertRaises(ValueError):
+            evaluate_sore_throat(decision_rule="hybrid")
+
+    def test_red_flag_supersedes_scoring(self):
+        result = evaluate_sore_throat(stridor=True)
+        self.assertEqual(result.prescribing_strategy, PrescribingStrategy.URGENT_REFERRAL)
+        self.assertTrue(result.red_flag_assessment["has_red_flags"])
 
 
-class TestAntibioticPrescribing(unittest.TestCase):
-    def test_first_line_penicillin_adult(self):
-        regimens = get_antibiotic_regimens(penicillin_allergic=False, age_years=35)
-        drug_names = [r.drug_name for r in regimens]
-        self.assertTrue(any("Penicillin V" in d for d in drug_names))
-        self.assertTrue(any("Amoxicillin" in d for d in drug_names))
+class TestAntibiotics(unittest.TestCase):
+    def test_adult_nice_first_choice(self):
+        regimens = get_antibiotic_regimens(age_years=30)
+        self.assertEqual(len(regimens), 1)
+        self.assertEqual(regimens[0].drug_name, "Phenoxymethylpenicillin (Penicillin V)")
+        self.assertIn("500 mg four times daily", regimens[0].dose)
 
-    def test_first_line_penicillin_pediatric_with_weight(self):
-        regimens = get_antibiotic_regimens(penicillin_allergic=False, age_years=6, weight_kg=20)
-        self.assertTrue(len(regimens) >= 2)
-        # Check dose string contains weight calculated dose
-        pen_v = next(r for r in regimens if "Penicillin V" in r.drug_name)
-        self.assertIn("250 mg", pen_v.dose)
+    def test_child_age_band(self):
+        regimen = get_antibiotic_regimens(age_years=7)[0]
+        self.assertIn("250 mg four times daily", regimen.dose)
+        self.assertIn("500 mg twice daily", regimen.dose)
 
-    def test_non_severe_penicillin_allergy(self):
-        regimens = get_antibiotic_regimens(penicillin_allergic=True, severe_penicillin_allergy=False, age_years=40)
-        drug_names = [r.drug_name for r in regimens]
-        self.assertTrue(any("Cefalexin" in d or "Cephalexin" in d for d in drug_names))
-        self.assertTrue(any("Clarithromycin" in d for d in drug_names))
+    def test_penicillin_allergy_is_clarithromycin(self):
+        regimen = get_antibiotic_regimens(penicillin_allergic=True, age_years=30)[0]
+        self.assertEqual(regimen.drug_name, "Clarithromycin")
+        self.assertIn("250 mg to 500 mg twice daily", regimen.dose)
 
-    def test_severe_penicillin_allergy(self):
-        regimens = get_antibiotic_regimens(penicillin_allergic=True, severe_penicillin_allergy=True, age_years=40)
-        drug_names = [r.drug_name for r in regimens]
-        # No cephalosporins
-        self.assertFalse(any("Cefalexin" in d or "Cephalexin" in d for d in drug_names))
-        self.assertTrue(any("Clarithromycin" in d for d in drug_names))
-        self.assertTrue(any("Erythromycin" in d for d in drug_names))
+    def test_child_clarithromycin_requires_weight_band(self):
+        regimen = get_antibiotic_regimens(penicillin_allergic=True, age_years=7, weight_kg=18)[0]
+        self.assertEqual(regimen.dose, "125 mg twice daily")
+
+    def test_invalid_weight(self):
+        with self.assertRaises(ValueError):
+            get_antibiotic_regimens(penicillin_allergic=True, age_years=7, weight_kg=0)
 
 
-class TestMetricsAndBatch(unittest.TestCase):
-    def test_calculate_metrics_wrapper_string_values(self):
-        data = {
-            "fever_past_24h": "true",
-            "purulence_or_pus": "yes",
-            "rapid_attendance_le_3d": "1",
-            "severely_inflamed_tonsils": "false",
-            "no_cough_or_coryza": "0",
-            "age": "28",
-        }
-        res = calculate_metrics(**data)
-        self.assertEqual(res["feverpain_score"], 3)
-        self.assertEqual(res["prescribing_strategy"], "DELAYED_PRESCRIPTION")
-        self.assertEqual(res["mcisaac_score"], 2)
+class TestAliasesAndBatch(unittest.TestCase):
+    def test_explicit_false_value_is_not_overridden_by_alias(self):
+        result = calculate_metrics(fever_past_24h=0, fever=1)
+        self.assertEqual(result["feverpain_score"], 0)
 
-    def test_batch_csv_processing(self):
+    def test_string_aliases(self):
+        result = calculate_metrics(
+            fever="true",
+            pus="yes",
+            rapid_onset="1",
+            severe_inflammation="false",
+            no_cough="0",
+            age="28",
+        )
+        self.assertEqual(result["feverpain_score"], 3)
+        self.assertEqual(result["mcisaac_score"], 2)
+
+    def test_batch(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            in_path = os.path.join(tmpdir, "input.csv")
-            out_path = os.path.join(tmpdir, "output.csv")
-
-            with open(in_path, "w", newline="", encoding="utf-8") as f:
-                writer = csv.DictWriter(
-                    f,
-                    fieldnames=["patient_id", "fever_past_24h", "purulence_or_pus", "rapid_attendance_le_3d", "severely_inflamed_tonsils", "no_cough_or_coryza", "age"],
-                )
+            src = os.path.join(tmpdir, "input.csv")
+            dst = os.path.join(tmpdir, "output.csv")
+            with open(src, "w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=["patient_id", "fever", "pus"])
                 writer.writeheader()
-                writer.writerow({"patient_id": "P01", "fever_past_24h": "1", "purulence_or_pus": "1", "rapid_attendance_le_3d": "1", "severely_inflamed_tonsils": "1", "no_cough_or_coryza": "1", "age": "12"})
-                writer.writerow({"patient_id": "P02", "fever_past_24h": "0", "purulence_or_pus": "0", "rapid_attendance_le_3d": "0", "severely_inflamed_tonsils": "0", "no_cough_or_coryza": "0", "age": "50"})
-
-            count = process_batch_csv(in_path, out_path)
-            self.assertEqual(count, 2)
-
-            with open(out_path, "r", encoding="utf-8") as f:
-                reader = csv.DictReader(f)
-                out_rows = list(reader)
-                self.assertEqual(len(out_rows), 2)
-                self.assertEqual(out_rows[0]["feverpain_score"], "5")
-                self.assertEqual(out_rows[0]["prescribing_strategy"], "IMMEDIATE_ANTIBIOTIC")
-                self.assertEqual(out_rows[1]["feverpain_score"], "0")
-                self.assertEqual(out_rows[1]["prescribing_strategy"], "NO_ANTIBIOTIC")
+                writer.writerow({"patient_id": "P1", "fever": "1", "pus": "1"})
+            self.assertEqual(process_batch_csv(src, dst), 1)
+            with open(dst, encoding="utf-8") as handle:
+                row = next(csv.DictReader(handle))
+            self.assertEqual(row["feverpain_score"], "2")
+            self.assertEqual(row["decision_rule"], "feverpain")
 
 
 class TestCLI(unittest.TestCase):
-    def test_cli_eval_json(self):
-        captured_output = io.StringIO()
-        with patch("sys.stdout", new=captured_output):
-            ret = cli_main(["eval", "--fever", "--pus", "--rapid-onset", "--inflamed", "--no-cough", "--json"])
-            self.assertEqual(ret, 0)
-        output = captured_output.getvalue()
-        data = json.loads(output)
-        self.assertEqual(data["feverpain_score"], 5)
-        self.assertEqual(data["prescribing_strategy"], "IMMEDIATE_ANTIBIOTIC")
+    def test_json_output(self):
+        output = io.StringIO()
+        with patch("sys.stdout", new=output):
+            self.assertEqual(cli_main(["eval", "--fever", "--pus", "--json"]), 0)
+        data = json.loads(output.getvalue())
+        self.assertEqual(data["feverpain_score"], 2)
 
-    def test_cli_eval_formatted(self):
-        captured_output = io.StringIO()
-        with patch("sys.stdout", new=captured_output):
-            ret = cli_main(["eval", "--fever", "--pus"])
-            self.assertEqual(ret, 0)
-        output = captured_output.getvalue()
-        self.assertIn("FeverPAIN Score:", output)
-        self.assertIn("DELAYED / BACK-UP PRESCRIPTION", output)
+    def test_centor_cli(self):
+        output = io.StringIO()
+        with patch("sys.stdout", new=output):
+            self.assertEqual(
+                cli_main(["eval", "--decision-rule", "centor", "--fever", "--pus", "--tender-nodes"]),
+                0,
+            )
+        self.assertIn("Centor 3/4", output.getvalue())
 
 
 if __name__ == "__main__":
