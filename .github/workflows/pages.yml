@@ -32,3 +32,20 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+
+      - name: Verify deployed application
+        shell: bash
+        run: |
+          url="${{ steps.deployment.outputs.page_url }}"
+          asset_url="${url%/}/scoring.mjs"
+          for attempt in {1..10}; do
+            if page="$(curl --fail --silent --show-error --location --max-time 20 "$url")" \
+              && grep -Fq '<title>FeverPAIN & Centor Sore Throat Calculator</title>' <<< "$page" \
+              && curl --fail --silent --show-error --location --max-time 20 "$asset_url" | grep -Fq 'feverPainScore'; then
+              echo "Verified $url"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Live Pages smoke test failed: $url" >&2
+          exit 1
